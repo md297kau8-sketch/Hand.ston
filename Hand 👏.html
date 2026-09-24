@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Find The Stone - FD44 Sync Edition</title>
+
+<!-- Firebase App SDK & Realtime Database SDK (Matching Platform) -->
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+
+<style>
+  :root {
+    --wood-1: #9b4714;
+    --wood-2: #6c2d07;
+    --wood-3: #401903;
+    --green: #1fd027;
+    --green-dark: #128a18;
+    --gold: #ffbe26;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+
+  body {
+    background: #080402;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    overflow: hidden;
+  }
+
+  #app {
+    width: 100vw;
+    max-width: 430px;
+    height: 100vh;
+    max-height: 920px;
+    background: radial-gradient(ellipse at 50% 30%, var(--wood-1) 0%, var(--wood-2) 65%, var(--wood-3) 100%);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 0 50px rgba(0,0,0,0.95);
+  }
+
+  #app::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: 
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, rgba(0,0,0,0.12) 130px, rgba(0,0,0,0.25) 132px),
+      radial-gradient(ellipse at 50% 15%, rgba(255,210,160,0.18), transparent 75%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .top-strip {
+    display: flex;
+    justify-content: space-around;
+    background: rgba(18, 9, 3, 0.96);
+    padding: 6px 4px;
+    font-size: 11px;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    z-index: 10;
+  }
+  .top-strip .green { color: #5cf46f; }
+  .top-strip .gray { color: #786f67; }
+
+  .info-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    color: #e0b080;
+    font-size: 11px;
+    font-weight: 600;
+    z-index: 10;
+  }
+  .menu-btn {
+    background: #3d1b09;
+    border: 1px solid #633113;
+    color: #fff;
+    padding: 2px 7px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .mult-bar {
+    display: flex;
+    align-items: center;
+    background: rgba(12, 5, 2, 0.9);
+    padding: 4px 6px;
+    gap: 4px;
+    z-index: 10;
+  }
+  .arrow {
+    background: #321607;
+    border: 1px solid #4a240f;
+    color: #df9e67;
+    width: 22px;
+    height: 38px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .track {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex: 1;
+  }
+  .track::-webkit-scrollbar { display: none; }
+  .card {
+    background: #250f04;
+    border: 1px solid #451f08;
+    border-radius: 4px;
+    min-width: 52px;
+    text-align: center;
+    padding: 3px 0;
+    transition: all 0.3s ease;
+  }
+  .card .num { font-size: 9px; color: #a47654; }
+  .card .val { font-size: 10px; font-weight: bold; color: #efe3d3; }
+  .card.active {
+    border-color: #5cf46f;
+    background: #281a07;
+    box-shadow: 0 0 8px rgba(92, 244, 111, 0.45);
+  }
+  .card.active .val { color: #5cf46f; }
+
+  .play-area {
+    flex: 1;
+    position: relative;
+    z-index: 5;
+  }
+
+  .hand-box {
+    position: absolute;
+    width: 145px;
+    top: -30px;
+    cursor: pointer;
+    transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.3, 1), filter 0.25s ease;
+  }
+  #hand-left { left: 13%; }
+  #hand-right { right: 13%; }
+
+  .hand-box.lifted {
+    transform: translateY(-90px) scale(1.03) !important;
+  }
+  .hand-box.ready {
+    animation: pulseSelect 1.2s infinite alternate;
+  }
+  @keyframes pulseSelect {
+    0% { filter: drop-shadow(0 0 5px rgba(92, 244, 111, 0.4)); }
+    100% { filter: drop-shadow(0 0 16px rgba(92, 244, 111, 0.9)); }
+  }
+
+  .realistic-hand {
+    width: 100%;
+    filter: drop-shadow(0 28px 20px rgba(0, 0, 0, 0.7));
+  }
+
+  .stone-item {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    background: radial-gradient(circle at 35% 30%, #ff6b6b, #b71515 70%, #560404 100%);
+    border-radius: 50%;
+    top: 255px;
+    box-shadow: 0 10px 16px rgba(0, 0, 0, 0.85);
+    display: none;
+    z-index: 4;
+  }
+  #stone-left { left: calc(13% + 56px); }
+  #stone-right { right: calc(13% + 56px); }
+
+  .bottom-ctrl {
+    background: linear-gradient(180deg, rgba(22, 10, 5, 0.95) 0%, #120703 100%);
+    padding: 12px 16px 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    z-index: 10;
+  }
+
+  .status-tag {
+    background: #0d0603;
+    border: 1px solid #361706;
+    color: #e5b98a;
+    text-align: center;
+    padding: 8px;
+    border-radius: 14px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .bet-plate {
+    background: linear-gradient(180deg, #9da6b1 0%, #636d7a 48%, #48515c 100%);
+    border-radius: 12px;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: inset 0 2px 2px rgba(255,255,255,0.45), 0 4px 8px rgba(0,0,0,0.6);
+  }
+  .mod-btn {
+    background: linear-gradient(180deg, #edf0f5, #b8c0ca);
+    border: 1px solid #758190;
+    border-radius: 8px;
+    color: #1f2732;
+    font-weight: 900;
+    font-size: 13px;
+    padding: 8px 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    cursor: pointer;
+  }
+  .mod-btn:active { transform: translateY(1px); }
+
+  .input-wrapper {
+    flex: 1;
+    background: #080a0c;
+    border-radius: 6px;
+    border: 1px solid #23272e;
+    display: flex;
+    align-items: center;
+    padding: 4px 10px;
+  }
+  .taka-symbol {
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 800;
+    margin-right: 6px;
+  }
+  .stake-input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-size: 18px;
+    font-weight: 800;
+  }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .bet-submit {
+    flex: 1;
+    background: linear-gradient(180deg, var(--green) 0%, var(--green-dark) 100%);
+    border: none;
+    border-radius: 14px;
+    padding: 13px;
+    color: #ffffff;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #0c6111, 0 10px 18px rgba(31, 208, 39, 0.4);
+    transition: all 0.1s;
+  }
+  .bet-submit:active {
+    transform: translateY(3px);
+    box-shadow: 0 2px 0 #0c6111, 0 5px 10px rgba(31, 208, 39, 0.4);
+  }
+  .bet-submit:disabled {
+    filter: grayscale(0.85) opacity(0.5);
+    cursor: not-allowed;
+  }
+
+  .cashout-btn {
+    flex: 1;
+    background: linear-gradient(180deg, #ffc73b 0%, #d88e00 100%);
+    border: none;
+    border-radius: 14px;
+    padding: 13px;
+    color: #1a1000;
+    font-size: 18px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 5px 0 #8c5d00, 0 10px 18px rgba(255, 199, 59, 0.4);
+    display: none;
+  }
+  .cashout-btn:active {
+    transform: translateY(3px);
+    box-shadow: 0 2px 0 #8c5d00;
+  }
+
+  .footer-info {
+    background: #0a0402;
+    padding: 6px 12px;
+    font-size: 10px;
+    color: #a48e7e;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    z-index: 10;
+  }
+  .footer-info div { display: flex; justify-content: space-between; }
+  .badge-demo {
+    background: #c7560e;
+    color: #fff;
+    font-size: 8px;
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 3px;
+    margin-right: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div class="top-strip">
+    <span class="green">1.95x</span>
+    <span class="green">1.95x</span>
+    <span class="gray">0.00x</span>
+    <span class="green">1.95x</span>
+    <span class="gray">0.00x</span>
+  </div>
+
+  <div class="info-bar">
+    <span>Hand</span>
+    <span style="color:#d49a62;">14:34</span>
+    <button class="menu-btn">☰</button>
+  </div>
+
+  <div class="mult-bar">
+    <button class="arrow" onclick="scrollTrack(-80)">‹</button>
+    <div class="track" id="multTrack">
+      <div class="card active" id="card-0"><div class="num">1</div><div class="val">1.95x</div></div>
+      <div class="card" id="card-1"><div class="num">2</div><div class="val">3.85x</div></div>
+      <div class="card" id="card-2"><div class="num">3</div><div class="val">7.50x</div></div>
+      <div class="card" id="card-3"><div class="num">4</div><div class="val">14.90x</div></div>
+      <div class="card" id="card-4"><div class="num">5</div><div class="val">29.50x</div></div>
+      <div class="card" id="card-5"><div class="num">6</div><div class="val">58.00x</div></div>
+      <div class="card" id="card-6"><div class="num">7</div><div class="val">115.00x</div></div>
+      <div class="card" id="card-7"><div class="num">8</div><div class="val">150.00x</div></div>
+    </div>
+    <button class="arrow" onclick="scrollTrack(80)">›</button>
+  </div>
+
+  <div class="play-area">
+    <div id="stone-left" class="stone-item"></div>
+    <div id="hand-left" class="hand-box" onclick="pickHand('left')">
+      <svg class="realistic-hand" viewBox="0 0 200 420">
+        <defs>
+          <linearGradient id="arm3dL" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#e89e7e"/>
+            <stop offset="35%" stop-color="#ffd5c0"/>
+            <stop offset="70%" stop-color="#f8bea3"/>
+            <stop offset="100%" stop-color="#cb7a58"/>
+          </linearGradient>
+          <radialGradient id="fist3dL" cx="45%" cy="60%" r="55%">
+            <stop offset="0%" stop-color="#ffdfd0"/>
+            <stop offset="45%" stop-color="#f5a484"/>
+            <stop offset="80%" stop-color="#c96645"/>
+            <stop offset="100%" stop-color="#73220c"/>
+          </radialGradient>
+        </defs>
+        <path d="M72,0 C72,60 68,130 65,190 L135,190 C132,130 128,60 128,0 Z" fill="url(#arm3dL)"/>
+        <path d="M78,175 C88,185 112,185 122,175" stroke="#ba6549" stroke-width="2" fill="none" opacity="0.4"/>
+        <path d="M42,190 C26,170 174,170 158,190 C184,225 188,300 164,335 C140,365 60,370 36,335 C12,300 16,225 42,190 Z" fill="url(#fist3dL)"/>
+        <path d="M44,235 C54,208 78,208 88,235" stroke="#75220c" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.55"/>
+        <path d="M88,235 C98,208 122,208 132,235" stroke="#75220c" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.55"/>
+        <path d="M132,235 C142,208 164,208 174,235" stroke="#75220c" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.55"/>
+        <path d="M26,260 C18,300 52,340 84,335 C88,308 52,275 46,255 Z" fill="#eb8d6d"/>
+        <ellipse cx="68" cy="320" rx="9.5" ry="6" fill="#be202e" transform="rotate(-22 68 320)"/>
+        <ellipse cx="66" cy="318.5" rx="4" ry="1.8" fill="#ffaab3" transform="rotate(-22 66 318.5)"/>
+      </svg>
+    </div>
+
+    <div id="stone-right" class="stone-item"></div>
+    <div id="hand-right" class="hand-box" onclick="pickHand('right')">
+      <svg class="realistic-hand" viewBox="0 0 200 420">
+        <defs>
+          <linearGradient id="arm3dR" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#cb7a58"/>
+            <stop offset="30%" stop-color="#f8bea3"/>
+            <stop offset="65%" stop-color="#ffd5c0"/>
+            <stop offset="100%" stop-color="#e89e7e"/>
+          </linearGradient>
+          <radialGradient id="fist3dR" cx="55%" cy="60%" r="55%">
+            <stop offset="0%" stop-color="#ffdfd0"/>
+            <stop offset="45%" stop-color="#f5a484"/>
+            <stop offset="80%" stop-color="#c96645"/>
+            <stop offset="100%" stop-color="#73220c"/>
+          </radialGradient>
+        </defs>
+        <path d="M72,0 C72,60 68,130 65,190 L135,190 C132,130 128,60 128,0 Z" fill="url(#arm3dR)"/>
+        <path d="M78,175 C88,185 112,185 122,175" stroke="#ba6549" stroke-width="2" fill="none" opacity="0.4"/>
+        <path d="M42,190 C26,170 174,170 158,190 C184,225 188,300 164,335 C140,365 60,370 36,335 C12,300 16,225 42,190 Z" fill="url(#fist3dR)"/>
+        <path d="M26,235 C36,208 58,208 68,235" stroke="#75220c" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.55"/>
+        <path d="M68,235 C78,208 102,208 112,235" stroke="#75220c" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.55"/>
+        <path d="M112,235 C122,208 146,208 156,235" stroke="#75220c" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.55"/>
+        <path d="M174,260 C182,300 148,340 116,335 C112,308 148,275 154,255 Z" fill="#eb8d6d"/>
+        <ellipse cx="132" cy="320" rx="9.5" ry="6" fill="#be202e" transform="rotate(22 132 320)"/>
+        <ellipse cx="134" cy="318.5" rx="4" ry="1.8" fill="#ffaab3" transform="rotate(22 134 318.5)"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="bottom-ctrl">
+    <div id="statusLabel" class="status-tag">Place Bet</div>
+
+    <div class="bet-plate">
+      <button class="mod-btn" onclick="multiplyBet(0.5)">1/2</button>
+      <div class="input-wrapper">
+        <span class="taka-symbol">৳</span>
+        <input type="number" id="customBet" class="stake-input" value="10" min="5" max="9999" />
+      </div>
+      <button class="mod-btn" onclick="multiplyBet(2)">2x</button>
+    </div>
+
+    <div class="action-row">
+      <button id="betBtn" class="bet-submit" onclick="startRound()">Bet</button>
+      <button id="cashoutBtn" class="cashout-btn" onclick="cashOut()">Cash Out</button>
+    </div>
+  </div>
+
+  <div class="footer-info">
+    <div>
+      <span><span class="badge-demo">FD44 SYNC</span>Round ID: <span id="roundNum">...</span></span>
+      <span>Find The Stone</span>
+    </div>
+    <div>
+      <span>Stake Limits: ৳ 5 - ৳ 9,999</span>
+      <span style="font-weight:bold; color:#ffd700;">Balance: ৳ <span id="balanceText">0.00</span></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ==========================================================
+     1. MATCHING FIREBASE REALTIME DATABASE INITIALIZATION
+     ========================================================== */
+  const firebaseConfig = {
+    apiKey: "AIzaSyAzG6l80RC_DnwKk7KlvVod2YU8GIC2oio",
+    authDomain: "nskk-2ca2d.firebaseapp.com",
+    databaseURL: "https://nskk-2ca2d-default-rtdb.firebaseio.com",
+    projectId: "nskk-2ca2d",
+    storageBucket: "nskk-2ca2d.firebasestorage.app",
+    messagingSenderId: "629774743594",
+    appId: "1:629774743594:web:a1610ad2d204eb791deb53",
+    measurementId: "G-YDXWDVFPZ3"
+  };
+
+  if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+  }
+  const database = firebase.database();
+  let activePhone = null;
+  let balance = 0.00;
+
+  // Multipliers up to 150x
+  let multipliers = [1.95, 3.85, 7.50, 14.90, 29.50, 58.00, 115.00, 150.00];
+  let currentStep = 0;
+  let initialBet = 10;
+  let currentProfit = 0;
+  let targetSide = 'left';
+  let gameState = 'IDLE';
+
+  const handLeft = document.getElementById('hand-left');
+  const handRight = document.getElementById('hand-right');
+  const stoneLeft = document.getElementById('stone-left');
+  const stoneRight = document.getElementById('stone-right');
+  const betBtn = document.getElementById('betBtn');
+  const cashoutBtn = document.getElementById('cashoutBtn');
+  const statusLabel = document.getElementById('statusLabel');
+  const customBet = document.getElementById('customBet');
+  const balanceText = document.getElementById('balanceText');
+  const roundNum = document.getElementById('roundNum');
+
+  /* 🚀 ১০০% লাইভ ব্যালেন্স সিঙ্ক (FD44 প্ল্যাটফর্মের সাথে ডিরেক্ট লিংক) */
+  function initUserDatabaseSync() {
+    const urlParams = new URLSearchParams(window.location.search);
+    let phoneFound = urlParams.get('phone') || urlParams.get('user') || urlParams.get('uid');
+
+    if (!phoneFound) {
+      try {
+        if (window.parent && window.parent.user && window.parent.user.phone) {
+          phoneFound = window.parent.user.phone;
+        }
+      } catch(e) {}
+    }
+
+    if (!phoneFound) {
+      try {
+        phoneFound = localStorage.getItem('bd99_user');
+      } catch(e) {}
+    }
+
+    if (phoneFound) {
+      bindUserAccount(phoneFound);
+    } else {
+      database.ref('users').limitToLast(1).once('value', (snap) => {
+        if (snap.exists()) {
+          const data = snap.val();
+          const lastPhone = Object.keys(data)[0];
+          if (lastPhone) bindUserAccount(lastPhone);
+        }
+      });
+    }
+  }
+
+  function bindUserAccount(phone) {
+    activePhone = phone;
+    try { localStorage.setItem('bd99_user', phone); } catch(e) {}
+
+    database.ref('users/' + phone + '/balance').on('value', (snapshot) => {
+      if (snapshot.exists() && snapshot.val() !== null) {
+        balance = parseFloat(snapshot.val()) || 0;
+        updateBalanceDisplay();
+
+        try {
+          if (window.parent && window.parent.document) {
+            window.parent.document.querySelectorAll('.userBalance').forEach(e => {
+              e.innerText = balance.toFixed(2);
+            });
+          }
+        } catch(e) {}
+      }
+    });
+  }
+
+  // ব্যালেন্স কাটা (FD44 এবং Find The Stone একসাথে কমবে)
+  function deductRealBalance(amount) {
+    balance = parseFloat((balance - amount).toFixed(2));
+    updateBalanceDisplay();
+
+    if (activePhone) {
+      database.ref('users/' + activePhone + '/balance').transaction((curr) => {
+        let val = parseFloat(curr);
+        if (isNaN(val)) return 0;
+        return Math.max(0, parseFloat((val - amount).toFixed(2)));
+      });
+
+      database.ref('users/' + activePhone + '/wager_left').transaction((curr) => {
+        let left = parseFloat(curr || 0) - amount;
+        return left < 0 ? 0 : parseFloat(left.toFixed(2));
+      });
+    }
+
+    try {
+      if (window.parent && window.parent.document) {
+        window.parent.document.querySelectorAll('.userBalance').forEach(e => {
+          e.innerText = balance.toFixed(2);
+        });
+      }
+    } catch(e) {}
+  }
+
+  // ব্যালেন্স যোগ (ক্যাশআউটের টাকা FD44 এবং Find The Stone একসাথে বাড়বে)
+  function addRealBalance(amount) {
+    if (amount <= 0) return;
+    balance = parseFloat((balance + amount).toFixed(2));
+    updateBalanceDisplay();
+
+    if (activePhone) {
+      database.ref('users/' + activePhone + '/balance').transaction((curr) => {
+        let val = parseFloat(curr || 0);
+        return parseFloat((val + amount).toFixed(2));
+      });
+    }
+
+    try {
+      if (window.parent && window.parent.document) {
+        window.parent.document.querySelectorAll('.userBalance').forEach(e => {
+          e.innerText = balance.toFixed(2);
+        });
+      }
+    } catch(e) {}
+  }
+
+  function updateBalanceDisplay() {
+    balanceText.textContent = balance.toFixed(2);
+  }
+
+  function scrollTrack(dist) {
+    document.getElementById('multTrack').scrollBy({ left: dist, behavior: 'smooth' });
+  }
+
+  function multiplyBet(factor) {
+    if (gameState !== 'IDLE') return;
+    let val = parseFloat(customBet.value) || 5;
+    val = Math.max(5, Math.min(9999, Math.round(val * factor)));
+    customBet.value = val;
+  }
+
+  function updateCards() {
+    for (let i = 0; i < multipliers.length; i++) {
+      const c = document.getElementById(`card-${i}`);
+      if (c) {
+        c.classList.remove('active');
+        if (i === currentStep) c.classList.add('active');
+      }
+    }
+    const activeEl = document.getElementById(`card-${currentStep}`);
+    if (activeEl) activeEl.scrollIntoView({ behavior: 'smooth', inline: 'center' });
+  }
+
+  function startRound() {
+    let betVal = parseFloat(customBet.value);
+    if (isNaN(betVal) || betVal < 5 || betVal > 9999) {
+      alert("সর্বনিম্ন ৫ টাকা এবং সর্বোচ্চ ৯,৯৯৯ টাকা বাজি ধরুন!");
+      return;
+    }
+    if (betVal > balance) {
+      alert("পর্যাপ্ত ব্যালেন্স নেই! FD44 প্ল্যাটফর্ম থেকে রিচার্জ করুন।");
+      return;
+    }
+    if (gameState !== 'IDLE') return;
+
+    initialBet = betVal;
+    
+    // ব্যালেন্স কাটা (FD44 ও Find The Stone একসাথে সিঙ্ক হবে)
+    deductRealBalance(initialBet);
+
+    roundNum.textContent = '100' + Math.floor(Math.random() * 8999999999999 + 1000000000000);
+
+    currentStep = 0;
+    updateCards();
+    customBet.disabled = true;
+
+    runStep();
+  }
+
+  function runStep() {
+    gameState = 'SHOWING';
+    betBtn.disabled = true;
+    cashoutBtn.style.display = 'none';
+    statusLabel.style.color = '#e5b98a';
+    statusLabel.textContent = `ধাপ ${currentStep + 1} (${multipliers[currentStep]}x): বলটি দেখুন...`;
+
+    targetSide = Math.random() > 0.5 ? 'right' : 'left';
+
+    if (targetSide === 'left') {
+      stoneLeft.style.display = 'block';
+      handLeft.classList.add('lifted');
+    } else {
+      stoneRight.style.display = 'block';
+      handRight.classList.add('lifted');
+    }
+
+    setTimeout(() => {
+      handLeft.classList.remove('lifted');
+      handRight.classList.remove('lifted');
+      stoneLeft.style.display = 'none';
+      stoneRight.style.display = 'none';
+
+      setTimeout(start3SecShuffle, 400);
+    }, 1000);
+  }
+
+  function start3SecShuffle() {
+    gameState = 'SHUFFLING';
+    statusLabel.textContent = 'হাত ঘোরানো হচ্ছে... (৩ সেকেন্ড)';
+
+    let shuffles = 0;
+    const interval = setInterval(() => {
+      shuffles++;
+      const dir = shuffles % 2 === 0 ? 1 : -1;
+      handLeft.style.transform = `translate(${dir * 110}px, ${dir * 8}px)`;
+      handRight.style.transform = `translate(${-dir * 110}px, ${-dir * 8}px)`;
+
+      if (shuffles >= 6) {
+        clearInterval(interval);
+        setTimeout(() => {
+          handLeft.style.transform = 'translate(0, 0)';
+          handRight.style.transform = 'translate(0, 0)';
+
+          gameState = 'CHOOSING';
+          statusLabel.textContent = 'বলটি কোন হাতে? হাত নির্বাচন করুন!';
+          handLeft.classList.add('ready');
+          handRight.classList.add('ready');
+
+          if (currentStep > 0) {
+            cashoutBtn.style.display = 'block';
+            cashoutBtn.textContent = `Cash Out (৳ ${currentProfit.toFixed(2)})`;
+          }
+        }, 500);
+      }
+    }, 450);
+  }
+
+  function pickHand(chosen) {
+    if (gameState !== 'CHOOSING') return;
+
+    gameState = 'REVEALING';
+    handLeft.classList.remove('ready');
+    handRight.classList.remove('ready');
+    cashoutBtn.style.display = 'none';
+
+    const chosenHand = chosen === 'left' ? handLeft : handRight;
+    chosenHand.classList.add('lifted');
+
+    if (targetSide === 'left') stoneLeft.style.display = 'block';
+    if (targetSide === 'right') stoneRight.style.display = 'block';
+
+    setTimeout(() => {
+      if (chosen === targetSide) {
+        const mult = multipliers[currentStep];
+        currentProfit = parseFloat((initialBet * mult).toFixed(2));
+
+        statusLabel.textContent = `সঠিক! ${mult}x লাভ (৳ ${currentProfit.toFixed(2)})`;
+        statusLabel.style.color = '#5cf46f';
+
+        setTimeout(() => {
+          handLeft.classList.remove('lifted');
+          handRight.classList.remove('lifted');
+          stoneLeft.style.display = 'none';
+          stoneRight.style.display = 'none';
+
+          if (currentStep < multipliers.length - 1) {
+            currentStep++;
+            updateCards();
+            runStep();
+          } else {
+            cashOut();
+          }
+        }, 1500);
+
+      } else {
+        statusLabel.textContent = 'ভুল হাত! বাজি হেরেছেন!';
+        statusLabel.style.color = '#ff6b6b';
+        setTimeout(resetGame, 1800);
+      }
+    }, 600);
+  }
+
+  function cashOut() {
+    if (currentProfit > 0) {
+      // ব্যালেন্স যোগ (জেতা টাকা FD44 ও Find The Stone একসাথে বাড়বে)
+      addRealBalance(currentProfit);
+      
+      statusLabel.textContent = `ক্যাশ আউট সফল! +৳ ${currentProfit.toFixed(2)}`;
+      statusLabel.style.color = '#ffbe26';
+    }
+    setTimeout(resetGame, 1500);
+  }
+
+  function resetGame() {
+    handLeft.classList.remove('lifted', 'ready');
+    handRight.classList.remove('ready');
+    stoneLeft.style.display = 'none';
+    stoneRight.style.display = 'none';
+
+    currentStep = 0;
+    currentProfit = 0;
+    updateCards();
+
+    statusLabel.textContent = 'Place Bet';
+    statusLabel.style.color = '#e5b98a';
+    betBtn.disabled = false;
+    customBet.disabled = false;
+    cashoutBtn.style.display = 'none';
+    gameState = 'IDLE';
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    initUserDatabaseSync();
+  });
+</script>
+</body>
+</html>
